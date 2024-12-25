@@ -2,15 +2,15 @@
 <html>
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mapbox-gl/2.15.0/mapbox-gl.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/mapbox-gl/2.15.0/mapbox-gl.css" rel="stylesheet" />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       overflow-x: hidden;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       color: #333;
-      height: 200vh; /* Allow scrolling */
+      height: 200vh;
     }
     #map { 
       width: 100vw; 
@@ -50,14 +50,7 @@
       gap: 10px;
       z-index: 1000;
     }
-    
-    .location-container {
-      position: absolute;
-      left: 20px;
-      top: 10px;
-      z-index: 1000;
-    }
-    .expand-btn, .theme-btn {
+    .expand-btn, .theme-btn, .view-btn {
       width: 40px;
       height: 40px;
       border: none;
@@ -79,6 +72,10 @@
     .theme-btn {
       background: #333;
     }
+    .view-btn {
+      background: #FF9500;
+      color: white;
+    }
     .expand-btn {
       background: #007AFF;
       color: white;
@@ -91,7 +88,6 @@
       transform: translateY(20%) !important;
     }
 
-    /* Dark mode styles */
     .dark-theme {
       background: #1a1a1a;
       color: #ffffff;
@@ -100,7 +96,6 @@
       border-bottom: 1px solid #333;
     }
 
-    /* Light theme styles */
     .light-theme {
       background: white;
       color: #333;
@@ -114,15 +109,12 @@
   <div id="map"></div>
   <div id="content" class="light-theme">
     <div class="handle"></div>
-    
-    <div class="location-container">
-      <button class="location-btn">📍 Re-center</button>
-    </div>
     <div class="button-container">
+      <button class="location-btn">📍 Re-center</button>
+      <button class="view-btn">🗺️</button>
       <button class="theme-btn">🌙</button>
       <button class="expand-btn">↕️</button>
     </div>
-    
     <div class="card"><h2>Location 1</h2><p>Description for location 1...</p></div>
     <div class="card"><h2>Location 2</h2><p>Description for location 2...</p></div>
     <div class="card"><h2>Location 3</h2><p>Description for location 3...</p></div>
@@ -131,46 +123,42 @@
   </div>
 
   <script>
-    const map = L.map('map');
-    let userLocation = null;
+    mapboxgl.accessToken = 'pk.eyJ1IjoiYWRpbmVzY3UiLCJhIjoiY201NGlwbGVmMnBsZDJrb3A4MmN0aTBqMiJ9.PQHXPZ5oYYt36cMj6FblrQ'; // You'll need to replace this with a valid token
     
-    const lightMap = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-      maxZoom: 19,
-      attribution: '© OpenStreetMap contributors, © CARTO'
+    const map = new mapboxgl.Map({
+      container: 'map',
+      style: 'mapbox://styles/mapbox/light-v11',
+      center: [-74.5, 40],
+      zoom: 9,
+      pitch: 0,
+      bearing: 0
     });
 
-    const darkMap = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      maxZoom: 19,
-      attribution: '© OpenStreetMap contributors, © CARTO'
-    });
-
-    lightMap.addTo(map);
-    let isDarkMode = false;
+    let userLocation = null;
+    let is3DMode = false;
 
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
         position => {
           const { latitude, longitude } = position.coords;
-          userLocation = [latitude, longitude];
-          map.setView(userLocation, 13);
+          userLocation = [longitude, latitude];
+          map.setCenter(userLocation);
         },
         error => {
-          userLocation = [51.505, -0.09];
-          map.setView(userLocation, 13);
+          console.log('Geolocation error:', error);
         }
       );
-    } else {
-      userLocation = [51.505, -0.09];
-      map.setView(userLocation, 13);
     }
 
     const content = document.getElementById('content');
     const expandBtn = document.querySelector('.expand-btn');
     const themeBtn = document.querySelector('.theme-btn');
+    const viewBtn = document.querySelector('.view-btn');
     const locationBtn = document.querySelector('.location-btn');
 
     let lastScrollY = window.scrollY;
     let isAtTop = false;
+    let isDarkMode = false;
 
     // Handle scroll events
     window.addEventListener('scroll', () => {
@@ -184,6 +172,91 @@
         expandBtn.innerHTML = '↑';
       }
       lastScrollY = window.scrollY;
+    });
+
+    // Initialize terrain source when map loads
+    map.on('load', () => {
+      map.addSource('mapbox-dem', {
+        'type': 'raster-dem',
+        'url': 'mapbox://mapbox.mapbox-terrain-dem-v1',
+        'tileSize': 512,
+        'maxzoom': 14
+      });
+    });
+
+    // Toggle 2D/3D view with smooth transitions
+    viewBtn.addEventListener('click', () => {
+      is3DMode = !is3DMode;
+      
+      // Store current camera position
+      const currentCenter = map.getCenter();
+      const currentZoom = map.getZoom();
+      
+      if (is3DMode) {
+        // Smooth transition to 3D mode
+        map.flyTo({
+          center: currentCenter,
+          zoom: currentZoom,
+          pitch: 60,
+          duration: 1000,
+          essential: true
+        });
+
+        // Gradually add terrain and atmospheric effects
+        let terrainProgress = 0;
+        const terrainTransition = setInterval(() => {
+          terrainProgress += 0.1;
+          if (terrainProgress > 1) {
+            clearInterval(terrainTransition);
+          }
+          
+          map.setTerrain({ 
+            source: 'mapbox-dem', 
+            exaggeration: 1.5 * terrainProgress 
+          });
+          
+          map.setFog({
+            'range': [1, 2],
+            'color': '#fff',
+            'horizon-blend': 0.3 * terrainProgress
+          });
+        }, 100);
+
+        viewBtn.innerHTML = '🌎';
+      } else {
+        // Smooth transition back to 2D mode
+        map.flyTo({
+          center: currentCenter,
+          zoom: currentZoom,
+          pitch: 0,
+          duration: 1000,
+          essential: true
+        });
+
+        // Gradually remove terrain and atmospheric effects
+        let terrainProgress = 1;
+        const terrainTransition = setInterval(() => {
+          terrainProgress -= 0.1;
+          if (terrainProgress <= 0) {
+            clearInterval(terrainTransition);
+            map.setTerrain(null);
+            map.setFog(null);
+          } else {
+            map.setTerrain({ 
+              source: 'mapbox-dem', 
+              exaggeration: 1.5 * terrainProgress 
+            });
+            
+            map.setFog({
+              'range': [1, 2],
+              'color': '#fff',
+              'horizon-blend': 0.3 * terrainProgress
+            });
+          }
+        }, 100);
+
+        viewBtn.innerHTML = '🗺️';
+      }
     });
 
     // Handle expand button click
@@ -201,31 +274,35 @@
       }
     });
 
+    // Toggle theme
     themeBtn.addEventListener('click', () => {
       isDarkMode = !isDarkMode;
       if (isDarkMode) {
-        map.removeLayer(lightMap);
-        darkMap.addTo(map);
+        map.setStyle('mapbox://styles/mapbox/dark-v11');
         themeBtn.innerHTML = '☀️';
         content.classList.remove('light-theme');
         content.classList.add('dark-theme');
       } else {
-        map.removeLayer(darkMap);
-        lightMap.addTo(map);
+        map.setStyle('mapbox://styles/mapbox/light-v11');
         themeBtn.innerHTML = '🌙';
         content.classList.remove('dark-theme');
         content.classList.add('light-theme');
       }
     });
 
+    // Handle location button click
     locationBtn.addEventListener('click', () => {
       if (userLocation) {
-        map.flyTo(userLocation, 13, {
-          duration: 1.5,
-          easeLinearity: 0.25
+        map.flyTo({
+          center: userLocation,
+          zoom: 13,
+          duration: 1500
         });
       }
     });
+
+    // Add navigation controls
+    map.addControl(new mapboxgl.NavigationControl());
   </script>
 </body>
 </html>
