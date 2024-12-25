@@ -24,14 +24,14 @@
       bottom: 0;
       left: 0;
       width: 100%;
-      z-index: 2; /* Ensure content stays above map */
+      z-index: 2;
       border-radius: 20px 20px 0 0;
       box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
       transition: transform 0.3s ease, background-color 0.3s ease, color 0.3s ease;
-      touch-action: pan-y;
       overflow-y: auto;
-      cursor: grab;
-      min-height: 50vh;
+      transform: translateY(70%);
+      max-height: 80vh; /* Maximum height is 80% of viewport */
+      height: 100vh; /* Initial height allows for transition */
     }
     .handle {
       width: 40px;
@@ -117,6 +117,9 @@
     let userLocation = null; // Store initial location
     const locationBtn = document.querySelector('.location-btn');
     const map = L.map('map');
+
+    let lastScrollY = window.scrollY;
+    let isAtTop = false;
     
     // Define light and dark map layers - both from CARTO
     const lightMap = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
@@ -150,10 +153,22 @@
       map.setView(userLocation, 13);
     }
 
+    window.addEventListener('scroll', () => {
+      if (window.scrollY > lastScrollY && !isAtTop) {
+        // Scrolling down
+        content.style.transform = 'translateY(20%)'; // Shows 80% of the content
+        isAtTop = true;
+      } else if (window.scrollY === 0 && isAtTop) {
+        // Scrolled back to top
+        content.style.transform = 'translateY(70%)';
+        isAtTop = false;
+      }
+      lastScrollY = window.scrollY;
+    });
+
     const content = document.getElementById('content');
     const expandBtn = document.querySelector('.expand-btn');
     const themeBtn = document.querySelector('.theme-btn');
-    let isDragging = false;
     let startY = 0;
     let startHeight = 0;
     
@@ -189,36 +204,6 @@
         });
       }
     });
-
-    function handleDragStart(clientY) {
-      if (content.classList.contains('expanded')) return;
-      isDragging = true;
-      startY = clientY;
-      startHeight = parseInt(content.style.transform.replace('translateY(', ''));
-      content.style.cursor = 'grabbing';
-    }
-
-    function handleDragMove(clientY) {
-      if (!isDragging) return;
-      
-      const deltaY = clientY - startY;
-      const newHeight = Math.max(0, Math.min(70, startHeight + (deltaY / window.innerHeight * 100)));
-      content.style.transform = `translateY(${newHeight}%)`;
-    }
-
-    function handleDragEnd() {
-      isDragging = false;
-      content.style.cursor = 'grab';
-    }
-
-    content.addEventListener('touchstart', e => handleDragStart(e.touches[0].clientY));
-    content.addEventListener('touchmove', e => handleDragMove(e.touches[0].clientY));
-    content.addEventListener('touchend', handleDragEnd);
-
-    content.addEventListener('mousedown', e => handleDragStart(e.clientY));
-    content.addEventListener('mousemove', e => handleDragMove(e.clientY));
-    content.addEventListener('mouseup', handleDragEnd);
-    content.addEventListener('mouseleave', handleDragEnd);
   </script>
 </body>
 </html>
