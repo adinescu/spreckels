@@ -11,19 +11,27 @@
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       color: #333;
     }
-    #map { width: 100vw; height: 100vh; position: fixed; top: 0; left: 0; }
+    #map { 
+      width: 100vw; 
+      height: 100vh; 
+      position: fixed; 
+      top: 0; 
+      left: 0;
+      z-index: 1; /* Ensure map stays below the card */
+    }
     #content {
       position: fixed;
       bottom: 0;
       left: 0;
       width: 100%;
+      z-index: 2; /* Ensure content stays above map */
       border-radius: 20px 20px 0 0;
       box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
       transition: transform 0.3s ease, background-color 0.3s ease, color 0.3s ease;
       touch-action: pan-y;
       overflow-y: auto;
       cursor: grab;
-      min-height: 50vh; /* Set a minimum height for collapsed state */
+      min-height: 50vh;
     }
     .handle {
       width: 40px;
