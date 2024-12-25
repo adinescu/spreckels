@@ -50,20 +50,21 @@
       z-index: 1000;
     }
     .expand-btn, .theme-btn, .location-btn {
-      background: #007AFF;
-      color: white;
+      width: 40px;  /* Fixed width and height for circle */
+      height: 40px;
       border: none;
-      padding: 8px 16px;
-      border-radius: 20px;
+      border-radius: 50%;  /* Makes it circular */
       cursor: pointer;
+      display: flex;  /* Center the icon */
+      align-items: center;
+      justify-content: center;
+      padding: 0;  /* Remove padding */
     }
     .location-btn {
-      background: #28CD41;
-      color: white;
-      border: none;
-      padding: 8px 16px;
+      width: auto;
+      height: auto;
       border-radius: 20px;
-      cursor: pointer;
+      padding: 8px 16px;
     }
     .theme-btn {
       background: #333;
@@ -102,8 +103,8 @@
     <div class="handle"></div>
     <div class="button-container">
       <button class="location-btn">📍 Re-center</button>
-      <button class="theme-btn">🌙 Dark</button>
-      <button class="expand-btn">Expand</button>
+      <button class="theme-btn">🌙</button>
+      <button class="expand-btn">↕️</button>
     </div>
     <div class="card"><h2>Location 1</h2><p>Description for location 1...</p></div>
     <div class="card"><h2>Location 2</h2><p>Description for location 2...</p></div>
@@ -160,7 +161,7 @@
 
     expandBtn.addEventListener('click', () => {
       content.classList.toggle('expanded');
-      expandBtn.textContent = content.classList.contains('expanded') ? 'Collapse' : 'Expand';
+      expandBtn.innerHTML = content.classList.contains('expanded') ? '↕️' : '↕️';
     });
 
     themeBtn.addEventListener('click', () => {
@@ -168,13 +169,13 @@
       if (isDarkMode) {
         map.removeLayer(lightMap);
         darkMap.addTo(map);
-        themeBtn.innerHTML = '☀️ Light';
+        themeBtn.innerHTML = '☀️';
         content.classList.remove('light-theme');
         content.classList.add('dark-theme');
       } else {
         map.removeLayer(darkMap);
         lightMap.addTo(map);
-        themeBtn.innerHTML = '🌙 Dark';
+        themeBtn.innerHTML = '🌙';
         content.classList.remove('dark-theme');
         content.classList.add('light-theme');
       }
