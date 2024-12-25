@@ -49,8 +49,16 @@
       gap: 10px;
       z-index: 1000;
     }
-    .expand-btn, .theme-btn {
+    .expand-btn, .theme-btn, .location-btn {
       background: #007AFF;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 20px;
+      cursor: pointer;
+    }
+    .location-btn {
+      background: #28CD41;
       color: white;
       border: none;
       padding: 8px 16px;
@@ -93,6 +101,7 @@
   <div id="content" class="light-theme">
     <div class="handle"></div>
     <div class="button-container">
+      <button class="location-btn">📍 Pin Drop</button>
       <button class="theme-btn">🌙 Dark</button>
       <button class="expand-btn">Expand</button>
     </div>
@@ -104,6 +113,8 @@
   </div>
 
   <script>
+    let userLocation = null; // Store initial location
+    const locationBtn = document.querySelector('.location-btn');
     const map = L.map('map');
     
     // Define light and dark map layers - both from CARTO
@@ -125,14 +136,17 @@
       navigator.geolocation.getCurrentPosition(
         position => {
           const { latitude, longitude } = position.coords;
-          map.setView([latitude, longitude], 13);
+          userLocation = [latitude, longitude]; // Store location
+          map.setView(userLocation, 13);
         },
         error => {
-          map.setView([51.505, -0.09], 13);
+          userLocation = [51.505, -0.09]; // Default location
+          map.setView(userLocation, 13);
         }
       );
     } else {
-      map.setView([51.505, -0.09], 13);
+      userLocation = [51.505, -0.09]; // Default location
+      map.setView(userLocation, 13);
     }
 
     const content = document.getElementById('content');
@@ -163,6 +177,15 @@
         themeBtn.innerHTML = '🌙 Dark';
         content.classList.remove('dark-theme');
         content.classList.add('light-theme');
+      }
+    });
+
+    locationBtn.addEventListener('click', () => {
+      if (userLocation) {
+        map.flyTo(userLocation, 13, {
+          duration: 1.5,
+          easeLinearity: 0.25
+        });
       }
     });
 
