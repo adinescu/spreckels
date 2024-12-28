@@ -134,20 +134,86 @@
       bearing: 0
     });
 
+    // Add pulsing dot CSS
+    const style = document.createElement('style');
+    style.textContent = `
+      .mapboxgl-user-location-dot {
+        width: 15px;
+        height: 15px;
+        border-radius: 50%;
+        background-color: #1da1f2;
+        position: relative;
+      }
+      .mapboxgl-user-location-dot::after {
+        content: '';
+        position: absolute;
+        width: 15px;
+        height: 15px;
+        border-radius: 50%;
+        background-color: #1da1f2;
+        animation: pulse 2s infinite;
+      }
+      @keyframes pulse {
+        0% {
+          transform: scale(1);
+          opacity: 1;
+        }
+        100% {
+          transform: scale(3);
+          opacity: 0;
+        }
+      }
+      .tracking-active {
+        background-color: #28CD41 !important;
+      }
+    `;
+    document.head.appendChild(style);
+
     let userLocation = null;
     let is3DMode = false;
+    let userMarker = null;
+    let isTracking = false;
+    let watchId = null;
 
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        position => {
-          const { latitude, longitude } = position.coords;
-          userLocation = [longitude, latitude];
-          map.setCenter(userLocation);
-        },
-        error => {
-          console.log('Geolocation error:', error);
-        }
-      );
+    // Initialize user location tracking
+    function initializeLocationTracking() {
+      if ("geolocation" in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          position => {
+            const { latitude, longitude } = position.coords;
+            userLocation = [longitude, latitude];
+            
+            // Create or update user marker
+            if (!userMarker) {
+              const el = document.createElement('div');
+              el.className = 'mapboxgl-user-location-dot';
+              userMarker = new mapboxgl.Marker({
+                element: el,
+                pitchAlignment: 'map',
+                rotationAlignment: 'map'
+              })
+              .setLngLat(userLocation)
+              .addTo(map);
+            } else {
+              userMarker.setLngLat(userLocation);
+            }
+
+            map.flyTo({
+              center: userLocation,
+              zoom: 15,
+              duration: 1500
+            });
+          },
+          error => {
+            console.error('Geolocation error:', error);
+            userLocation = [-74.5, 40]; // Default location
+            map.setCenter(userLocation);
+          },
+          {
+            enableHighAccuracy: true
+          }
+        );
+      }
     }
 
     const content = document.getElementById('content');
@@ -174,13 +240,281 @@
       lastScrollY = window.scrollY;
     });
 
-    // Initialize terrain source when map loads
+    // Process GPX files and create GeoJSON data
+    async function processGPXFiles(files) {
+      const points = [];
+      
+      for (const file of files) {
+        const text = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (e) => resolve(e.target.result);
+          reader.readAsText(file);
+        });
+
+        const parser = new DOMParser();
+        const gpx = parser.parseFromString(text, "text/xml");
+        const trackPoints = gpx.getElementsByTagName("trkpt");
+
+        for (const point of trackPoints) {
+          points.push([
+            parseFloat(point.getAttribute("lon")),
+            parseFloat(point.getAttribute("lat"))
+          ]);
+        }
+      }
+
+      // Aggregate points to create weighted data
+      const gridSize = 0.0001; // Adjust grid size for aggregation precision
+      const pointCounts = {};
+
+      points.forEach(([lon, lat]) => {
+        const gridX = Math.floor(lon / gridSize) * gridSize;
+        const gridY = Math.floor(lat / gridSize) * gridSize;
+        const key = `${gridX},${gridY}`;
+        pointCounts[key] = (pointCounts[key] || 0) + 1;
+      });
+
+      // Convert to GeoJSON format
+      const features = Object.entries(pointCounts).map(([key, count]) => {
+        const [lon, lat] = key.split(',').map(Number);
+        return {
+          type: 'Feature',
+          properties: {
+            weight: count
+          },
+          geometry: {
+            type: 'Point',
+            coordinates: [lon, lat]
+          }
+        };
+      });
+
+      return {
+        type: 'FeatureCollection',
+        features: features
+      };
+    }
+
+    // Initialize terrain and tile sources when map loads
     map.on('load', () => {
+      // Add terrain source
       map.addSource('mapbox-dem', {
         'type': 'raster-dem',
         'url': 'mapbox://mapbox.mapbox-terrain-dem-v1',
         'tileSize': 512,
         'maxzoom': 14
+      });
+
+      // Add satellite imagery tiles
+      map.addSource('satellite', {
+        'type': 'raster',
+        'url': 'mapbox://mapbox.satellite',
+        'tileSize': 512,
+        'maxzoom': 22
+      });
+
+      // Add terrain tiles
+      map.addSource('terrain-rgb', {
+        'type': 'raster',
+        'url': 'mapbox://mapbox.terrain-rgb',
+        'tileSize': 512,
+        'maxzoom': 14
+      });
+
+      // Add satellite layer (initially hidden)
+      map.addLayer({
+        'id': 'satellite-layer',
+        'type': 'raster',
+        'source': 'satellite',
+        'layout': {
+          'visibility': 'none'
+        }
+      });
+
+      // Add terrain RGB visualization layer (initially hidden)
+      map.addLayer({
+        'id': 'terrain-rgb-layer',
+        'type': 'raster',
+        'source': 'terrain-rgb',
+        'layout': {
+          'visibility': 'none'
+        }
+      });
+
+      // Add heatmap layer source and layer
+      map.addSource('activity-heatmap', {
+        'type': 'geojson',
+        'data': {
+          'type': 'FeatureCollection',
+          'features': []
+        }
+      });
+
+      map.addLayer({
+        'id': 'activity-heatmap-layer',
+        'type': 'heatmap',
+        'source': 'activity-heatmap',
+        'layout': {
+          'visibility': 'none'
+        },
+        'paint': {
+          // Increase weight as zoom level increases
+          'heatmap-weight': [
+            'interpolate',
+            ['linear'],
+            ['get', 'weight'],
+            0, 0,
+            10, 1
+          ],
+          // Increase intensity as zoom level increases
+          'heatmap-intensity': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            0, 1,
+            15, 3
+          ],
+          // Assign color values based on point density
+          'heatmap-color': [
+            'interpolate',
+            ['linear'],
+            ['heatmap-density'],
+            0, 'rgba(33,102,172,0)',
+            0.2, 'rgb(103,169,207)',
+            0.4, 'rgb(209,229,240)',
+            0.6, 'rgb(253,219,199)',
+            0.8, 'rgb(239,138,98)',
+            1, 'rgb(178,24,43)'
+          ],
+          // Adjust the heatmap radius with zoom level
+          'heatmap-radius': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            0, 2,
+            9, 20
+          ],
+          // Decrease opacity as zoom increases
+          'heatmap-opacity': 0.8
+        }
+      });
+
+      // Add GPX file input
+      const gpxInput = document.createElement('input');
+      gpxInput.type = 'file';
+      gpxInput.multiple = true;
+      gpxInput.accept = '.gpx';
+      gpxInput.style.display = 'none';
+      document.body.appendChild(gpxInput);
+
+      // Add layer control buttons
+      const layerControl = document.createElement('div');
+      layerControl.className = 'mapboxgl-ctrl mapboxgl-ctrl-group';
+      layerControl.style.position = 'absolute';
+      layerControl.style.left = '10px';
+      layerControl.style.top = '10px';
+      
+      const baseMapBtn = document.createElement('button');
+      baseMapBtn.innerHTML = '🗺️';
+      baseMapBtn.title = 'Base Map';
+      
+      const satelliteBtn = document.createElement('button');
+      satelliteBtn.innerHTML = '🛰️';
+      satelliteBtn.title = 'Satellite';
+      
+      const terrainBtn = document.createElement('button');
+      terrainBtn.innerHTML = '⛰️';
+      terrainBtn.title = 'Terrain';
+
+      const heatmapBtn = document.createElement('button');
+      heatmapBtn.innerHTML = '🔥';
+      heatmapBtn.title = 'Activity Heatmap';
+      
+      const uploadBtn = document.createElement('button');
+      uploadBtn.innerHTML = '📤';
+      uploadBtn.title = 'Upload GPX Files';
+
+      [baseMapBtn, satelliteBtn, terrainBtn, heatmapBtn, uploadBtn].forEach(btn => {
+        btn.style.padding = '10px';
+        btn.style.cursor = 'pointer';
+        btn.style.backgroundColor = 'white';
+        btn.style.border = '1px solid #ddd';
+        layerControl.appendChild(btn);
+      });
+
+      document.getElementById('map').appendChild(layerControl);
+
+      // Handle layer toggling
+      let activeLayer = 'base';
+      
+      baseMapBtn.addEventListener('click', () => {
+        if (activeLayer !== 'base') {
+          map.setLayoutProperty('satellite-layer', 'visibility', 'none');
+          map.setLayoutProperty('terrain-rgb-layer', 'visibility', 'none');
+          map.setStyle(isDarkMode ? 'mapbox://styles/mapbox/dark-v11' : 'mapbox://styles/mapbox/light-v11');
+          activeLayer = 'base';
+        }
+      });
+
+      satelliteBtn.addEventListener('click', () => {
+        if (activeLayer !== 'satellite') {
+          map.setLayoutProperty('terrain-rgb-layer', 'visibility', 'none');
+          map.setLayoutProperty('satellite-layer', 'visibility', 'visible');
+          activeLayer = 'satellite';
+        }
+      });
+
+      terrainBtn.addEventListener('click', () => {
+        if (activeLayer !== 'terrain') {
+          map.setLayoutProperty('satellite-layer', 'visibility', 'none');
+          map.setLayoutProperty('terrain-rgb-layer', 'visibility', 'visible');
+          activeLayer = 'terrain';
+        }
+      });
+
+      // Handle GPX file upload and heatmap generation
+      uploadBtn.addEventListener('click', () => {
+        gpxInput.click();
+      });
+
+      gpxInput.addEventListener('change', async (e) => {
+        const files = Array.from(e.target.files);
+        if (files.length === 0) return;
+
+        // Show loading indicator
+        uploadBtn.innerHTML = '⏳';
+        
+        try {
+          const geojsonData = await processGPXFiles(files);
+          map.getSource('activity-heatmap').setData(geojsonData);
+          
+          // Auto-switch to heatmap layer
+          map.setLayoutProperty('satellite-layer', 'visibility', 'none');
+          map.setLayoutProperty('terrain-rgb-layer', 'visibility', 'none');
+          map.setLayoutProperty('activity-heatmap-layer', 'visibility', 'visible');
+          activeLayer = 'heatmap';
+
+          // Fit map to heatmap bounds
+          const bounds = new mapboxgl.LngLatBounds();
+          geojsonData.features.forEach(feature => {
+            bounds.extend(feature.geometry.coordinates);
+          });
+          map.fitBounds(bounds, { padding: 50 });
+        } catch (error) {
+          console.error('Error processing GPX files:', error);
+        } finally {
+          uploadBtn.innerHTML = '📤';
+        }
+      });
+
+      // Add heatmap layer toggle
+      heatmapBtn.addEventListener('click', () => {
+        if (activeLayer !== 'heatmap') {
+          map.setLayoutProperty('satellite-layer', 'visibility', 'none');
+          map.setLayoutProperty('terrain-rgb-layer', 'visibility', 'none');
+          map.setLayoutProperty('activity-heatmap-layer', 'visibility', 'visible');
+          activeLayer = 'heatmap';
+        }
       });
     });
 
@@ -290,12 +624,37 @@
       }
     });
 
+    // Update location button style and functionality
+    locationBtn.classList.add('location-btn');
+    locationBtn.innerHTML = '📍';
+    locationBtn.style.width = '40px';
+    locationBtn.style.height = '40px';
+    locationBtn.style.borderRadius = '50%';
+    locationBtn.style.padding = '0';
+    locationBtn.style.display = 'flex';
+    locationBtn.style.alignItems = 'center';
+    locationBtn.style.justifyContent = 'center';
+
     // Handle location button click
     locationBtn.addEventListener('click', () => {
+      if (!isTracking) {
+        // Start tracking
+        isTracking = true;
+        locationBtn.classList.add('tracking-active');
+        locationBtn.innerHTML = '🎯';
+        startLocationTracking();
+      } else {
+        // Stop tracking
+        isTracking = false;
+        locationBtn.classList.remove('tracking-active');
+        locationBtn.innerHTML = '📍';
+        stopLocationTracking();
+      }
+
       if (userLocation) {
         map.flyTo({
           center: userLocation,
-          zoom: 13,
+          zoom: 15,
           duration: 1500
         });
       }
