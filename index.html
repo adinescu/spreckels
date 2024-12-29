@@ -76,8 +76,6 @@
 </head>
 <body>
   <div class="route-card">
-    <div id="map" class="map-preview"></div>
-    <div class="route-info">
       <div class="route-header">
         <div class="avatar"></div>
         <div class="user-info">
@@ -96,6 +94,8 @@
           ⏱️ <span id="duration">Calculating...</span>
         </div>
       </div>
+    <div id="map" class="map-preview"></div>
+    <div class="route-info">
     </div>
   </div>
 
@@ -121,9 +121,9 @@
         shadowUrl: ''
       },
       polyline_options: {
-        color: '#2ECC40',
-        weight: 2.5,
-        opacity: 1.0
+        color: '#333',
+        weight: 3,
+        opacity: 0.9
       }
     })
       .on('loaded', function(e) {
