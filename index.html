@@ -108,7 +108,7 @@
       doubleClickZoom: false
     });
     
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
       attribution: ''
     }).addTo(map);
 
@@ -121,9 +121,9 @@
         shadowUrl: ''
       },
       polyline_options: {
-        color: '#3388ff',
-        weight: 3,
-        opacity: 0.8
+        color: '#2ECC40',
+        weight: 2.5,
+        opacity: 1.0
       }
     })
       .on('loaded', function(e) {
