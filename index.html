@@ -200,24 +200,26 @@
         let totalHr = 0;
         let hrReadings = 0;
         
-        track.get_points().forEach(point => {
-          // Get the extensions element
-          const extensions = point.querySelector('extensions');
-          if (extensions) {
-            // Find heart rate data in TrackPointExtension
-            const hrElement = extensions.querySelector('gpxtpx\\:TrackPointExtension gpxtpx\\:hr');
-            if (hrElement) {
-              const hr = parseInt(hrElement.textContent);
-              if (!isNaN(hr)) {
-                totalHr += hr;
-                hrReadings++;
-              }
+        const heartRates = track.get_points().map(point => {
+            const rawPoint = point.childNodes[0]; // Get the raw XML point
+            if (rawPoint && rawPoint.getElementsByTagNameNS) {
+                const extensions = rawPoint.getElementsByTagNameNS("*", "TrackPointExtension");
+                if (extensions.length > 0) {
+                    const hrElements = extensions[0].getElementsByTagNameNS("*", "hr");
+                    if (hrElements.length > 0) {
+                        return parseInt(hrElements[0].textContent);
+                    }
+                }
             }
-          }
-        });
+            return null;
+        }).filter(hr => hr !== null);
         
-        const avgHr = hrReadings > 0 ? Math.round(totalHr / hrReadings) : 'N/A';
-        document.getElementById('heartrate').textContent = `${avgHr} bpm`;
+        if (heartRates.length > 0) {
+            const avgHr = Math.round(heartRates.reduce((a, b) => a + b) / heartRates.length);
+            document.getElementById('heartrate').textContent = `${avgHr} bpm`;
+        } else {
+            document.getElementById('heartrate').textContent = 'No HR data';
+        }
       })
       .addTo(map);
   </script>
