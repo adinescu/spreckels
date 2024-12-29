@@ -3,207 +3,143 @@
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-gpx/1.7.0/gpx.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      overflow: hidden;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      color: #333;
-    }
-    #map { 
-      width: 100vw; 
-      height: 100vh; 
-      position: fixed; 
-      top: 0; 
-      left: 0;
-      z-index: 1; /* Ensure map stays below the card */
-    }
-    #content {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      width: 100%;
-      z-index: 2;
-      border-radius: 20px 20px 0 0;
-      box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
-      transition: transform 0.3s ease, background-color 0.3s ease, color 0.3s ease;
-      overflow-y: auto;
-      transform: translateY(70%);
-      max-height: 80vh; /* Maximum height is 80% of viewport */
-      height: 100vh; /* Initial height allows for transition */
-    }
-    .handle {
-      width: 40px;
-      height: 4px;
-      background: #ddd;
-      border-radius: 2px;
-      margin: 10px auto;
-      position: relative;
-    }
-    .button-container {
-      position: absolute;
-      right: 20px;
-      top: 10px;
-      display: flex;
-      gap: 10px;
-      z-index: 1000;
-    }
-    .expand-btn, .theme-btn, .location-btn {
-      width: 40px;  /* Fixed width and height for circle */
-      height: 40px;
-      border: none;
-      border-radius: 50%;  /* Makes it circular */
-      cursor: pointer;
-      display: flex;  /* Center the icon */
-      align-items: center;
-      justify-content: center;
-      padding: 0;  /* Remove padding */
-    }
-    .location-btn {
-      width: auto;
-      height: auto;
-      border-radius: 20px;
-      padding: 8px 16px;
-    }
-    .theme-btn {
-      background: #333;
-    }
-    .card {
+      margin: 0;
       padding: 20px;
-      transition: border-color 0.3s ease;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f5;
     }
-    .expanded { 
-      transform: translateY(20%) !important; 
-      height: 80vh !important; /* Explicitly set height when expanded */
-    }
-
-    /* Dark mode styles */
-    .dark-theme {
-      background: #1a1a1a;
-      color: #ffffff;
-    }
-    .dark-theme .card {
-      border-bottom: 1px solid #333;
-    }
-
-    /* Light theme styles */
-    .light-theme {
+    .route-card {
       background: white;
-      color: #333;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      overflow: hidden;
+      max-width: 500px;
+      margin: 0 auto;
     }
-    .light-theme .card {
-      border-bottom: 1px solid #eee;
+    .map-preview {
+      width: 100%;
+      height: 200px;
+      background: #e5e5e5;
     }
-</style>
+    .route-info {
+      padding: 16px;
+    }
+    .route-header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 20px;
+      background: #e0e0e0;
+      margin-right: 12px;
+    }
+    .user-info {
+      flex: 1;
+    }
+    .username {
+      font-weight: 600;
+      margin: 0;
+    }
+    .timestamp {
+      color: #666;
+      font-size: 14px;
+      margin: 0;
+    }
+    .stats {
+      display: flex;
+      gap: 16px;
+      font-size: 14px;
+      color: #666;
+      border-top: 1px solid #eee;
+      padding-top: 12px;
+      margin-top: 12px;
+    }
+    .stat {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .leaflet-container {
+      background: #f8f8f8;
+    }
+    .leaflet-control-container {
+      display: none;
+    }
+  </style>
 </head>
 <body>
-  <div id="map"></div>
-  <div id="content" class="light-theme">
-    <div class="handle"></div>
-    <div class="button-container">
-      <button class="location-btn">📍 Re-center</button>
-      <button class="theme-btn">🌙</button>
-      <button class="expand-btn">↕️</button>
+  <div class="route-card">
+    <div id="map" class="map-preview"></div>
+    <div class="route-info">
+      <div class="route-header">
+        <div class="avatar"></div>
+        <div class="user-info">
+          <h3 class="username">John Doe</h3>
+          <p class="timestamp">2 hours ago</p>
+        </div>
+      </div>
+      <div class="stats">
+        <div class="stat">
+          📏 <span id="distance">Calculating...</span>
+        </div>
+        <div class="stat">
+          ⛰️ <span id="elevation">Calculating...</span>
+        </div>
+        <div class="stat">
+          ⏱️ <span id="duration">Calculating...</span>
+        </div>
+      </div>
     </div>
-    <div class="card"><h2>Location 1</h2><p>Description for location 1...</p></div>
-    <div class="card"><h2>Location 2</h2><p>Description for location 2...</p></div>
-    <div class="card"><h2>Location 3</h2><p>Description for location 3...</p></div>
-    <div class="card"><h2>Location 4</h2><p>Description for location 4...</p></div>
-    <div class="card"><h2>Location 5</h2><p>Description for location 5...</p></div>
   </div>
 
   <script>
-    let userLocation = null; // Store initial location
-    const locationBtn = document.querySelector('.location-btn');
-    const map = L.map('map');
-
-    let lastScrollY = window.scrollY;
-    let isAtTop = false;
+    const map = L.map('map', {
+      zoomControl: false,
+      dragging: false,
+      touchZoom: false,
+      scrollWheelZoom: false,
+      doubleClickZoom: false
+    });
     
-    // Define light and dark map layers - both from CARTO
-    const lightMap = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-      maxZoom: 19,
-      attribution: '© OpenStreetMap contributors, © CARTO'
-    });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: ''
+    }).addTo(map);
 
-    const darkMap = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      maxZoom: 19,
-      attribution: '© OpenStreetMap contributors, © CARTO'
-    });
-
-    // Start with light theme
-    lightMap.addTo(map);
-    let isDarkMode = false;
-
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        position => {
-          const { latitude, longitude } = position.coords;
-          userLocation = [latitude, longitude]; // Store location
-          map.setView(userLocation, 13);
-        },
-        error => {
-          userLocation = [51.505, -0.09]; // Default location
-          map.setView(userLocation, 13);
-        }
-      );
-    } else {
-      userLocation = [51.505, -0.09]; // Default location
-      map.setView(userLocation, 13);
-    }
-
-    window.addEventListener('scroll', () => {
-      if (window.scrollY > lastScrollY && !isAtTop) {
-        // Scrolling down
-        content.style.transform = 'translateY(20%)'; // Shows 80% of the content
-        isAtTop = true;
-      } else if (window.scrollY === 0 && isAtTop) {
-        // Scrolled back to top
-        content.style.transform = 'translateY(70%)';
-        isAtTop = false;
+    // Load and display the GPX track
+    const gpxFile = new L.GPX('56_bike_path.gpx', {
+      async: true,
+      marker_options: {
+        startIconUrl: '',
+        endIconUrl: '',
+        shadowUrl: ''
+      },
+      polyline_options: {
+        color: '#3388ff',
+        weight: 3,
+        opacity: 0.8
       }
-      lastScrollY = window.scrollY;
-    });
-
-    const content = document.getElementById('content');
-    const expandBtn = document.querySelector('.expand-btn');
-    const themeBtn = document.querySelector('.theme-btn');
-    let startY = 0;
-    let startHeight = 0;
-    
-    content.style.transform = 'translateY(70%)';
-
-    expandBtn.addEventListener('click', () => {
-      content.classList.toggle('expanded');
-      expandBtn.innerHTML = content.classList.contains('expanded') ? '↕️' : '↕️';
-    });
-
-    themeBtn.addEventListener('click', () => {
-      isDarkMode = !isDarkMode;
-      if (isDarkMode) {
-        map.removeLayer(lightMap);
-        darkMap.addTo(map);
-        themeBtn.innerHTML = '☀️';
-        content.classList.remove('light-theme');
-        content.classList.add('dark-theme');
-      } else {
-        map.removeLayer(darkMap);
-        lightMap.addTo(map);
-        themeBtn.innerHTML = '🌙';
-        content.classList.remove('dark-theme');
-        content.classList.add('light-theme');
-      }
-    });
-
-    locationBtn.addEventListener('click', () => {
-      if (userLocation) {
-        map.flyTo(userLocation, 13, {
-          duration: 1.5,
-          easeLinearity: 0.25
+    })
+      .on('loaded', function(e) {
+        map.fitBounds(e.target.getBounds(), {
+          padding: [20, 20]
         });
-      }
-    });
+        
+        const track = e.target;
+        document.getElementById('distance').textContent = 
+          (track.get_distance() / 1000).toFixed(1) + ' km';
+        document.getElementById('elevation').textContent = 
+          track.get_elevation_gain().toFixed(0) + 'm gain';
+        document.getElementById('duration').textContent = 
+          track.get_duration_string();
+      })
+      .addTo(map);
   </script>
 </body>
 </html>
