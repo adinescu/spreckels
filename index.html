@@ -25,13 +25,11 @@
       height: 200px;
       background: #e5e5e5;
     }
-    .route-info {
-      padding: 16px;
-    }
     .route-header {
       display: flex;
       align-items: center;
       margin-bottom: 12px;
+      padding: 16px;
     }
     .avatar {
       width: 40px;
@@ -42,6 +40,7 @@
     }
     .user-info {
       flex: 1;
+      margin-bottom: 12px;
     }
     .username {
       font-weight: 600;
@@ -58,13 +57,37 @@
       font-size: 14px;
       color: #666;
       border-top: 1px solid #eee;
-      padding-top: 12px;
-      margin-top: 12px;
     }
     .stat {
       display: flex;
       align-items: center;
       gap: 4px;
+    }
+    .user-section {
+      display: flex;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .social-footer {
+      padding: 12px 16px;
+      border-top: 1px solid #eee;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      color: #666;
+      font-size: 14px;
+    }
+    
+    .interaction {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+    
+    .interaction:hover {
+      color: #333;
     }
     .leaflet-container {
       background: #f8f8f8;
@@ -75,29 +98,39 @@
   </style>
 </head>
 <body>
-  <div class="route-card">
+    <div class="route-card">
       <div class="route-header">
-        <div class="avatar"></div>
-        <div class="user-info">
-          <h3 class="username">John Doe</h3>
-          <p class="timestamp">2 hours ago</p>
+        <div class="user-section">
+          <div class="avatar"></div>
+          <div class="user-info">
+            <h3 class="username">John Doe</h3>
+            <p class="timestamp">2 hours ago</p>
+          </div>
+        </div>
+        <div class="stats">
+          <div class="stat">
+            📏 <span id="distance">Calculating...</span>
+          </div>
+          <div class="stat">
+            ⛰️ <span id="elevation">Calculating...</span>
+          </div>
+          <div class="stat">
+            ⏱️ <span id="duration">Calculating...</span>
+          </div>
         </div>
       </div>
-      <div class="stats">
-        <div class="stat">
-          📏 <span id="distance">Calculating...</span>
+      
+      <div id="map" class="map-preview"></div>
+      
+      <div class="social-footer">
+        <div class="interaction">
+          ❤️ <span>24 likes</span>
         </div>
-        <div class="stat">
-          ⛰️ <span id="elevation">Calculating...</span>
-        </div>
-        <div class="stat">
-          ⏱️ <span id="duration">Calculating...</span>
+        <div class="interaction">
+          💬 <span>3 comments</span>
         </div>
       </div>
-    <div id="map" class="map-preview"></div>
-    <div class="route-info">
     </div>
-  </div>
 
   <script>
     const map = L.map('map', {
