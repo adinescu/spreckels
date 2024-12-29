@@ -139,11 +139,11 @@
       doubleClickZoom: false
     });
     
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
       attribution: ''
     }).addTo(map);
 
-    const gpxFile = new L.GPX('/path/to/your/route.gpx', {
+    const gpxFile = new L.GPX('56_bike_path.gpx', {
       async: true,
       marker_options: {
         startIconUrl: '',
@@ -172,8 +172,8 @@
           (track.get_distance() / 1000).toFixed(1) + ' km';
         document.getElementById('elevation').textContent = 
           track.get_elevation_gain().toFixed(0) + 'm gain';
-          
-        // Format duration based on length
+        
+          // Format duration based on length
         const formatDuration = (seconds) => {
           if (seconds < 60) {
             return seconds + ' secs';
@@ -197,16 +197,21 @@
         document.getElementById('speed').textContent = `${avgSpeed} km/h`;
         
         // Calculate average heart rate
-        const points = track.get_points();
         let totalHr = 0;
         let hrReadings = 0;
         
-        points.forEach(point => {
-          if (point.getElementsByTagName('gpxtpx:hr').length > 0) {
-            const hr = parseInt(point.getElementsByTagName('gpxtpx:hr')[0].textContent);
-            if (!isNaN(hr)) {
-              totalHr += hr;
-              hrReadings++;
+        track.get_points().forEach(point => {
+          // Get the extensions element
+          const extensions = point.querySelector('extensions');
+          if (extensions) {
+            // Find heart rate data in TrackPointExtension
+            const hrElement = extensions.querySelector('gpxtpx\\:TrackPointExtension gpxtpx\\:hr');
+            if (hrElement) {
+              const hr = parseInt(hrElement.textContent);
+              if (!isNaN(hr)) {
+                totalHr += hr;
+                hrReadings++;
+              }
             }
           }
         });
